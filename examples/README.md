@@ -98,7 +98,10 @@ checked with `check_ozx.py` before the RFC makes statements about them.
 
 ## Open questions this raised for the RFC
 
-1. Are directory entries (`image/`) permitted? They are zero-length non-`zarr.json` records.
+1. Directory entries (`image/`): permitted in the RFC text. Tested: zarr-python 3.4.1 reads a hierarchy with and without
+   them identically (members, `list_dir`, array data); only the raw `store.list()` additionally returns the
+   keys ending in `/`. If `jsonFirst` is `true` they must follow the `zarr.json` records, which the JDK zip
+   file system cannot do (it creates them first).
 
 Resolved in the RFC text: "use ZIP64" is now split into (1) the ZIP64 end of central directory records
 SHOULD be present, and (2) entries that are or may become larger than 4 GiB SHOULD use the ZIP64 extra fields
