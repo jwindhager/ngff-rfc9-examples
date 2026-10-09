@@ -28,6 +28,7 @@ Note: `openZip` calls `reader.getEntries()`, which reads the whole central direc
 | `write_ozx.py` | Python standard library `zipfile` | STORE, ZIP64 requested, central directory sorted, comment |
 | `java/WriteOzxJdk.java` | JDK `java.util.zip` (run with `java WriteOzxJdk.java dir out.ozx`) | STORE, comment, `zarr.json` written first; no ZIP64 |
 | `java/WriteOzxCommonsCompress.java` | Apache Commons Compress | STORE, ZIP64 always, comment |
+| `write_ozx_stream_zip.py` | `stream-zip` (third party) | STORE, ZIP64 end records and extra fields, comment added by patching |
 | `../check_ozx.py` | Python standard library | checks the MUST rules on a path or URL using range requests |
 
 All three writers produced archives that `check_ozx.py` reports as having no MUST violations and that
@@ -113,3 +114,46 @@ SHOULD be present, and (2) entries that are or may become larger than 4 GiB SHOU
 | `WriteOzxJdk.java` | no | no (cannot be forced) |
 | `WriteOzxCommonsCompress.java` | yes | yes (all entries) |
 | JDK zipfs with `forceZIP64End` | yes | no |
+
+## Additional Python options
+
+### `stream-zip` (third-party, tested with 0.0.84) — tested
+`write_ozx_stream_zip.py`. Not based on `zipfile`; writes ZIP and ZIP64 per member.
+1. With `NO_COMPRESSION_64` members it writes **both ZIP64 recommendations**: the ZIP64 end records and the ZIP64 extra field in
+   every central directory record (the only library tested other than Commons Compress that does).
+2. `extended_timestamps=False` avoids the `0x5455` extra field.
+3. Central directory order is the member order; STORE is supported (`NO_COMPRESSION_32` / `NO_COMPRESSION_64`).
+4. **No archive comment option** (checked in the function signature). `set_zip_comment()` in the example patches the comment
+   onto a finished archive by rewriting the last two bytes of the end record; this also works for archives from the JDK zip file system
+   (tested: `unzip -t` accepts the result).
+5. It also supports AES encryption, which RFC-9 prohibits at the archive level, and directory members.
+6. Not investigated: memory behavior for stored members.
+
+### Recent changes in Python's `zipfile`
+From the CPython documentation (3.14) and source:
+| Version | Change | Relevance |
+|---|---|---|
+| 3.4 | ZIP64 extensions enabled by default (`allowZip64=True`) | the end records are written only when required |
+| 3.5 | writing to unseekable streams | |
+| 3.11 | `ZipFile.mkdir()` | directory entries (permitted by RFC-9) |
+| 3.13 | `ZipFile.open(..., "w")` file objects have `name` and `mode`; public `compress_level` | |
+| 3.14 | `ZIP_ZSTANDARD` compression | **not allowed** in OME-Zarr zip files (STORE only) |
+| 3.14 | `ZipFile.writestr` respects `SOURCE_DATE_EPOCH` | reproducible archives |
+| 3.15 (rc3) | no `zipfile` additions found in the docs | |
+| development branch, 3.16.0a0 (unreleased) | **`ZipFile.remove()` and `ZipFile.repack()`** | see below |
+
+Tested for this document: `remove()` and `repack()` taken from the CPython `main` branch source and run on 3.15.0rc3. After a metadata
+rewrite had produced a duplicate `zarr.json`, `zf.remove(old_info)` followed by `zf.repack([old_info])` left one `zarr.json` (the newer
+value), reclaimed the obsolete local entry (101 bytes in the example), and `testzip()` passed. This is the tool needed for the RFC's
+recommendation to remove duplicate central directory records after appending. The API is documented as "versionadded: next" and may change before release.
+Still true in the development source: no API for the central directory order (sort `ZipFile.filelist`), and the ZIP64 end records
+are written only when the 4 GiB / 65,535 entry limits are exceeded (`_write_end_record`), so they cannot be forced for a small archive.
+
+```python
+# Python >= 3.16 (unreleased): drop an obsolete duplicate record and reclaim its space
+with zipfile.ZipFile("data.ozx", "a") as zf:
+    old = [i for i in zf.infolist() if i.filename == "zarr.json"][0]  # the first, obsolete record
+    zf.repack([zf.remove(old)])
+```
+
+Not tested: `pyzipper`, `zipfly`, `remotezip` (reading), `fsspec` zip filesystem.

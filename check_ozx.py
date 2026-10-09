@@ -75,7 +75,7 @@ def read_directory(src):
         j = tail.rfind(b"PK\x06\x07", 0, i)
         _, _, rec_off, _ = struct.unpack("<4sLQL", tail[j:j + 20])
         rec = src.read(rec_off, 56)
-        (_, _, _, _, _, _, n_total, _, cd_size, cd_off) = struct.unpack("<4sQ2H2L4Q", rec)
+        (_, _, _, _, disk, cd_disk, _, n_total, cd_size, cd_off) = struct.unpack("<4sQ2H2L4Q", rec)
         zip64 = True
     elif tail.rfind(b"PK\x06\x07", 0, i) >= 0:
         zip64 = True
