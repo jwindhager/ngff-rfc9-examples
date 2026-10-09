@@ -1,0 +1,104 @@
+# Writing and checking OME-Zarr zip files (.ozx): examples and library notes
+
+Material for the RFC-9 implementation guidance (issue #11). Everything marked **tested** was run for
+this document (macOS, Python 3.9.6 and 3.12, OpenJDK 21.0.3, zarr-python 3.4.1, Apache Commons
+Compress 1.27.1) and checked with `../check_ozx.py`. Libraries not listed here were not tested.
+
+## Where concrete examples come from
+
+[Zipglancer](https://github.com/JaneliaSciComp/zipglancer) (a client-side explorer for ZIP and `.ozx`
+archives) is a **reader**, so it provides reader-side examples and test data, not writer examples:
+
+- `src/lib/zipReader.ts`: opening a remote archive with `@zip.js/zip.js` `HttpRangeReader`, reading the
+  central directory and the archive comment with range requests (`openZip`).
+- `src/lib/ozx.ts`: parsing the RFC-9 archive comment (`ome.version`, `ome.zipFile.centralDirectory.jsonFirst`).
+- `src/data/sciVisDatasets.ts`: about 50 public `.ozx` files, e.g.
+  `https://ome-zarr-scivis.s3.us-east-1.amazonaws.com/v0.5/96x2-ozx/bunny.ozx`.
+  `check_ozx.py` found no MUST violations in the three it was run on (`bunny`, `skull`,
+  `marmoset_neurons`): all STORE, no extra fields, `zarr.json` records first, `jsonFirst: true`, no ZIP64.
+  (Their writer is not documented in the repository.)
+
+Note: `openZip` calls `reader.getEntries()`, which reads the whole central directory. In the files read,
+`jsonFirst` is parsed and displayed, but I saw no early termination of the central directory parse.
+
+## Examples in this directory
+
+| File | Library | Notes |
+|---|---|---|
+| `write_ozx.py` | Python standard library `zipfile` | STORE, ZIP64 requested, central directory sorted, comment |
+| `java/WriteOzxJdk.java` | JDK `java.util.zip` (run with `java WriteOzxJdk.java dir out.ozx`) | STORE, comment, `zarr.json` written first; no ZIP64 |
+| `java/WriteOzxCommonsCompress.java` | Apache Commons Compress | STORE, ZIP64 always, comment |
+| `../check_ozx.py` | Python standard library | checks the MUST rules on a path or URL using range requests |
+
+All three writers produced archives that `check_ozx.py` reports as having no MUST violations and that
+`unzip -t` accepts.
+
+## Known deficiencies of the libraries tested
+
+"Tested" = observed in this work; "source" = read in the library source.
+
+### Python `zipfile` (3.9.6, 3.12) — tested
+1. **No API for the central directory order.** The record order is the order of `ZipFile.filelist`.
+   `write_ozx.py` sorts that list before `close()`. This relies on a CPython implementation detail.
+2. **ZIP64 can only be requested per entry, and only affects local headers.** `ZipFile.open(zinfo, "w", force_zip64=True)`
+   puts a ZIP64 extra field (20 bytes) in each local header, but the central directory records, the
+   end record and "version needed to extract" (20) are unchanged for small archives. There is no way to force the
+   ZIP64 end-of-central-directory records on an archive below the 4 GiB / 65,535 entry limits.
+3. **Duplicate names are allowed.** Writing a name twice emits a `UserWarning: Duplicate name` and produces
+   two central directory records. There is no API to remove an entry in the versions tested.
+4. The archive comment must be `bytes` (at most 65,535).
+
+### zarr-python 3.4.1 `ZipStore` (Python 3.12) — tested
+1. **Duplicate `zarr.json` records** whenever metadata is rewritten (attributes updated twice gave two records for
+   `zarr.json` and for `image/zarr.json`). This is the behavior reported in Comment 4.
+2. No archive comment, no ZIP64 forcing, no `zarr.json`-first ordering.
+3. On the other hand: entries are STORED by default and no extra fields are written, so no MUST is violated.
+
+### JDK `java.util.zip.ZipOutputStream` (OpenJDK 21) — tested
+1. **STORED entries need size and CRC-32 before the entry is written**, so the data has to be read twice or buffered.
+2. **No way to force ZIP64**; it is used only when needed.
+3. **The central directory order is the write order**, so `zarr.json`-first order forces all `zarr.json` entries to be
+   written before any chunk (conflicts with writing metadata after the data, see Comment 4).
+4. `setComment` works.
+
+### JDK zip file system (`jdk.zipfs`, OpenJDK 21) — tested and source
+1. STORED is supported through the documented `compressionMethod=STORED` environment property.
+2. **ZIP64 end records can be forced only with the undocumented `forceZIP64End` property** (it works: the end records
+   appear), as noted in Review 1.
+3. **No archive comment**: the end record is written with comment length 0 (source), so the RFC's recommended comment cannot be written.
+4. **Writes extended timestamp extra fields (`0x5455`)** on file entries (allowed by the RFC); I found no option to switch this off.
+5. **Creates directory entries** such as `image/` and `image/s0/` when parent directories are created
+   (required before writing a file into a directory). The RFC does not say whether directory entries are permitted.
+   They are non-`zarr.json` records and would also break the `jsonFirst` assertion if they precede the `zarr.json` records.
+
+### Apache Commons Compress 1.27.1 — tested
+1. Works for STORED, ZIP64 always and comment (`WriteOzxCommonsCompress.java`); needs `commons-io` and `commons-lang3` at run time.
+2. **ZIP64 overhead is not "a few bytes"**: on the 7-entry example the archive is 440 bytes larger than the
+   JDK writer's (about 63 bytes per entry): 20 bytes of ZIP64 extra field per local header plus 32 bytes per central
+   directory record, among other differences. At one million entries that is tens of megabytes.
+3. Central directory order is the write order.
+
+### Common to all writers tested
+- **None of them lets the writer set the central directory order independently of the write order**, other than the
+  `zipfile` list workaround above.
+- **"ZIP64 used" means different things**: Python marks local headers only, Commons Compress marks local headers and
+  central directory records, zipfs marks only the end record (with `forceZIP64End`), the JDK output stream only
+  when required. A reader checking only the central directory or only the end record will see different things.
+- **Per-entry ZIP64 cost is 20 to about 60 bytes**, not "a few bytes" as the RFC text says.
+
+### Reading remote archives in a browser (from zipglancer's source)
+- Some servers (zipglancer's source names S3) support range requests but do not expose `Accept-Ranges` through CORS, so zip.js needs
+  `forceRangeRequests` and the data server must send `Access-Control-Allow-Headers: Range` and
+  `Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges` (zipglancer README).
+
+### Not tested
+zip4j, libzip, Go `archive/zip`, Rust `zip` / `zarrs_zip`, tensorstore, zarrita.js writers, zip.js writers, and
+command line tools (`zip`, `7z`). Their behavior regarding STORE, ZIP64, extra fields, ordering and comments should be
+checked with `check_ozx.py` before the RFC makes statements about them.
+
+## Open questions this raised for the RFC
+
+1. What does "use the ZIP64 format" mean operationally (local header extra field, central directory extra field, end
+   records)? Writers differ (see above).
+2. Are directory entries (`image/`) permitted? They are zero-length non-`zarr.json` records.
+3. The statement that ZIP64 costs "a few bytes per entry" should be corrected (20 to about 60 bytes).
