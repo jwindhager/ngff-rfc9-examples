@@ -15,8 +15,8 @@ and measures:
   5. index_sorted   sorting names for bisect lookup (O(N log N)).
   6. lookup_hash / lookup_bisect  per-lookup cost after indexing.
   7. parse_jsonfirst  jsonFirst discovery: parse records from the start of the
-                    central directory and stop at the first entry that is not
-                    a zarr.json (cost depends on the number of zarr.json
+                    central directory and stop at the first entry that is neither a
+                    zarr.json nor a directory entry (cost depends on the number of zarr.json
                     entries J, not on N).
 
 Only the central directory is touched; entry data is tiny filler. Timings are
@@ -171,6 +171,9 @@ def parse_jsonfirst(f, cd_off, cd_size, block=65536):
             if pos + rec > len(buf):
                 break
             name = buf[pos + 46:pos + 46 + nlen].decode("utf-8")
+            if name.endswith("/"):  # directory entries are ignored by jsonFirst
+                pos += rec
+                continue
             if not name.endswith("zarr.json"):
                 return names, read
             names.append(name)

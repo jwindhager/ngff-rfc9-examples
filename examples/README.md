@@ -69,7 +69,7 @@ All three writers produced archives that `check_ozx.py` reports as having no MUS
 4. **Writes extended timestamp extra fields (`0x5455`)** on file entries (allowed by the RFC); I found no option to switch this off.
 5. **Creates directory entries** such as `image/` and `image/s0/` when parent directories are created
    (required before writing a file into a directory). The RFC does not say whether directory entries are permitted.
-   They are non-`zarr.json` records and would also break the `jsonFirst` assertion if they precede the `zarr.json` records.
+   The RFC ignores directory entries for the purpose of `jsonFirst`.
 
 ### Apache Commons Compress 1.27.1 — tested
 1. Works for STORED, ZIP64 always and comment (`WriteOzxCommonsCompress.java`); needs `commons-io` and `commons-lang3` at run time.
@@ -100,8 +100,8 @@ checked with `check_ozx.py` before the RFC makes statements about them.
 
 1. Directory entries (`image/`): permitted in the RFC text. Tested: zarr-python 3.4.1 reads a hierarchy with and without
    them identically (members, `list_dir`, array data); only the raw `store.list()` additionally returns the
-   keys ending in `/`. If `jsonFirst` is `true` they must follow the `zarr.json` records, which the JDK zip
-   file system cannot do (it creates them first).
+   keys ending in `/`. They are ignored by `jsonFirst` (they may appear anywhere), so writers such as the JDK zip file
+   system, which creates them first, can still produce `jsonFirst` archives if the `zarr.json` entries precede the other files.
 
 Resolved in the RFC text: "use ZIP64" is now split into (1) the ZIP64 end of central directory records
 SHOULD be present, and (2) entries that are or may become larger than 4 GiB SHOULD use the ZIP64 extra fields

@@ -14,7 +14,8 @@ Checks of the central directory (MUST unless noted):
   - no data before the first local file header (lowest local header offset is 0)
 SHOULD / informational:
   - ZIP64 records in use
-  - all zarr.json records precede all other records (jsonFirst order), and
+  - all zarr.json records precede all other records, ignoring directory entries
+    (names ending in '/') (jsonFirst order), and
     whether the comment says so (a `jsonFirst: true` comment on an unordered
     archive is an inconsistency)
   - duplicate names in the central directory
@@ -145,7 +146,7 @@ def main():
         (dups if n in seen else seen).add(n)
     if dups:
         should.append(f"{len(dups)} duplicate names in the central directory, e.g. {sorted(dups)[0]}")
-    is_json = [n.endswith("zarr.json") for n in names]
+    is_json = [n.endswith("zarr.json") for n in names if not n.endswith("/")]
     ordered = all(is_json[i] >= is_json[i + 1] for i in range(len(is_json) - 1))
 
     comment_ok, jf = False, None
