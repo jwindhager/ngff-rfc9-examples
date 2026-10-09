@@ -9,7 +9,9 @@ What it does, with the RFC-9 requirement it addresses:
   * every entry is STORED (no ZIP-level compression)           MUST
   * no extra fields except ZIP64 (ZipInfo has none by default)  MUST
   * nothing before the first local file header                  MUST
-  * ZIP64 is requested for every entry (force_zip64)            SHOULD
+  * ZIP64 extra fields are requested for every entry in the local
+    headers (force_zip64); the ZIP64 end records cannot be forced
+    with zipfile for small archives, so recommendation 1 is not met  SHOULD
   * zarr.json records are sorted to the front of the central
     directory (root first, then breadth-first), the entries
     themselves are written in any order                         SHOULD

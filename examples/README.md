@@ -98,7 +98,15 @@ checked with `check_ozx.py` before the RFC makes statements about them.
 
 ## Open questions this raised for the RFC
 
-1. What does "use the ZIP64 format" mean operationally (local header extra field, central directory extra field, end
-   records)? Writers differ (see above).
-2. Are directory entries (`image/`) permitted? They are zero-length non-`zarr.json` records.
-3. The statement that ZIP64 costs "a few bytes per entry" should be corrected (20 to about 60 bytes).
+1. Are directory entries (`image/`) permitted? They are zero-length non-`zarr.json` records.
+
+Resolved in the RFC text: "use ZIP64" is now split into (1) the ZIP64 end of central directory records
+SHOULD be present, and (2) entries that are or may become larger than 4 GiB SHOULD use the ZIP64 extra fields
+(MAY for all entries), and the per-entry overhead is stated as tens of bytes. Against these recommendations of the examples here:
+
+| Writer | (1) end records | (2) extra fields |
+|---|---|---|
+| `write_ozx.py` (Python `zipfile`) | cannot be written for small archives | local headers only |
+| `WriteOzxJdk.java` | no | no (cannot be forced) |
+| `WriteOzxCommonsCompress.java` | yes | yes (all entries) |
+| JDK zipfs with `forceZIP64End` | yes | no |

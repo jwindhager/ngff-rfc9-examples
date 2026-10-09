@@ -135,8 +135,11 @@ def main():
         if sig != b"PK\x03\x04":
             must.append("no local file header at offset 0")
 
-    if not d["zip64"] and not any(1 in e["extra"] for e in E):
-        should.append("ZIP64 not used")
+    if not d["zip64"]:
+        should.append("ZIP64 end of central directory records are not present")
+    n_zip64_cd = sum(1 for e in E if 1 in e["extra"])
+    info.append(f"ZIP64 end records: {d['zip64']}; ZIP64 extra field in {n_zip64_cd}/{len(E)} "
+                "central directory records (local header extra fields are not checked)")
     seen, dups = set(), set()
     for n in names:
         (dups if n in seen else seen).add(n)
