@@ -140,17 +140,17 @@ From the CPython documentation (3.14) and source:
 | 3.14 | `ZIP_ZSTANDARD` compression | **not allowed** in OME-Zarr zip files (STORE only) |
 | 3.14 | `ZipFile.writestr` respects `SOURCE_DATE_EPOCH` | reproducible archives |
 | 3.15 (rc3) | no `zipfile` additions found in the docs | |
-| development branch, 3.16.0a0 (unreleased) | **`ZipFile.remove()` and `ZipFile.repack()`** | see below |
+| planned for 3.16 (unreleased; in the development branch, 3.16.0a0) | **`ZipFile.remove()` and `ZipFile.repack()`** | see below |
 
 Tested for this document: `remove()` and `repack()` taken from the CPython `main` branch source and run on 3.15.0rc3. After a metadata
 rewrite had produced a duplicate `zarr.json`, `zf.remove(old_info)` followed by `zf.repack([old_info])` left one `zarr.json` (the newer
 value), reclaimed the obsolete local entry (101 bytes in the example), and `testzip()` passed. This is the tool needed for the RFC's
-recommendation to remove duplicate central directory records after appending. The API is documented as "versionadded: next" and may change before release.
+recommendation to remove duplicate central directory records after appending. These methods are planned for Python 3.16 and are not yet released; the API is documented as "versionadded: next" and may change before release.
 Still true in the development source: no API for the central directory order (sort `ZipFile.filelist`), and the ZIP64 end records
 are written only when the 4 GiB / 65,535 entry limits are exceeded (`_write_end_record`), so they cannot be forced for a small archive.
 
 ```python
-# Python >= 3.16 (unreleased): drop an obsolete duplicate record and reclaim its space
+# Planned for Python 3.16 (not yet released): drop an obsolete duplicate record and reclaim its space
 with zipfile.ZipFile("data.ozx", "a") as zf:
     old = [i for i in zf.infolist() if i.filename == "zarr.json"][0]  # the first, obsolete record
     zf.repack([zf.remove(old)])
