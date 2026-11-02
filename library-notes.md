@@ -2,7 +2,7 @@
 
 Material for the RFC-9 implementation guidance (issue #11). Everything marked **tested** was run for
 this document (macOS, Python 3.9.6 and 3.12, OpenJDK 21.0.3, zarr-python 3.4.1, Apache Commons
-Compress 1.27.1) and checked with `../check_ozx.py`. Libraries not listed here were not tested.
+Compress 1.27.1) and checked with [`checker/check_ozx.py`](checker/check_ozx.py). Libraries not listed here were not tested.
 
 ## Where concrete examples come from
 
@@ -21,15 +21,15 @@ archives) is a **reader**, so it provides reader-side examples and test data, no
 Note: `openZip` calls `reader.getEntries()`, which reads the whole central directory. In the files read,
 `jsonFirst` is parsed and displayed, but I saw no early termination of the central directory parse.
 
-## Examples in this directory
+## Examples in this repository
 
 | File | Library | Notes |
 |---|---|---|
-| `write_ozx.py` | Python standard library `zipfile` | STORE, ZIP64 requested, central directory sorted, comment |
-| `java/WriteOzxJdk.java` | JDK `java.util.zip` (run with `java WriteOzxJdk.java dir out.ozx`) | STORE, comment, `zarr.json` written first; no ZIP64 |
-| `java/WriteOzxCommonsCompress.java` | Apache Commons Compress | STORE, ZIP64 always, comment |
-| `write_ozx_stream_zip.py` | `stream-zip` (third party) | STORE, ZIP64 end records and extra fields, comment added by patching |
-| `../check_ozx.py` | Python standard library | checks the MUST rules on a path or URL using range requests |
+| [`writers/python/write_ozx.py`](writers/python/write_ozx.py) | Python standard library `zipfile` | STORE, ZIP64 requested, central directory sorted, comment |
+| [`writers/java/WriteOzxJdk.java`](writers/java/WriteOzxJdk.java) | JDK `java.util.zip` (run with `java WriteOzxJdk.java dir out.ozx`) | STORE, comment, `zarr.json` written first; no ZIP64 |
+| [`writers/java/WriteOzxCommonsCompress.java`](writers/java/WriteOzxCommonsCompress.java) | Apache Commons Compress | STORE, ZIP64 always, comment |
+| [`writers/python/write_ozx_stream_zip.py`](writers/python/write_ozx_stream_zip.py) | `stream-zip` (third party) | STORE, ZIP64 end records and extra fields, comment added by patching |
+| [`checker/check_ozx.py`](checker/check_ozx.py) | Python standard library | checks the MUST rules on a path or URL using range requests |
 
 All three writers produced archives that `check_ozx.py` reports as having no MUST violations and that
 `unzip -t` accepts.
