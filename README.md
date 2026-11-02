@@ -1,4 +1,13 @@
-# RFC-9 supporting scripts
+# RFC-9 supporting scripts and examples
+
+Scripts, examples and library notes accompanying
+[RFC-9: OME-Zarr zip files](https://ngff.openmicroscopy.org/rfc/9/).
+Extracted from `scripts/rfc9/` in [jwindhager/ngff](https://github.com/jwindhager/ngff)
+(branch `mkitti/easy-items`), with its commit history.
+
+- `check_ozx.py`: checks an `.ozx` file (local path or URL) against the MUST / SHOULD rules of RFC-9.
+- `bench_central_directory.py`, `verify_external_claims.py`: see below.
+- [`examples/`](examples/README.md): writer examples (Python, Java) and notes on the libraries tested.
 
 Standard-library Python only (tested with 3.9).
 
@@ -8,7 +17,7 @@ Fetches the two external sources cited in the RFC's _Performance_ section and ch
 figure quoted in the RFC appears in the source, printing context so that the interpretation can be
 confirmed by a human. A match shows only that the number occurs, not that the RFC reads it correctly.
 
-    python3 scripts/rfc9/verify_external_claims.py
+    python3 verify_external_claims.py
 
 ## `bench_central_directory.py`
 
@@ -16,7 +25,7 @@ Builds synthetic OME-Zarr-like zip files (STORE, ZIP64 on every entry, `zarr.jso
 `jsonFirst: true`, or last) and measures central directory costs.
 Timings are CPU / page-cache timings on a local file and do not include network latency.
 
-    python3 scripts/rfc9/bench_central_directory.py --sizes 100,1000,10000,100000,1000000 --reps 3
+    python3 bench_central_directory.py --sizes 100,1000,10000,100000,1000000 --reps 3
 
 ### Expected complexity
 
