@@ -20,8 +20,8 @@ import java.util.zip.ZipOutputStream;
  *
  * RFC-9 requirements addressed:
  *  - every entry is STORED                    (MUST)   ZipEntry.STORED needs size and CRC up front
- *  - no extra fields                          (MUST)   none are written for entries without
- *                                                      explicit access/creation times
+ *  - no extra fields that change how entry    (MUST)   none are written for entries without
+ *    data is interpreted                               explicit access/creation times
  *  - archive comment with the ome JSON        (SHOULD) ZipOutputStream.setComment
  *  - zarr.json records first, breadth-first   (SHOULD) see limitation below
  *
