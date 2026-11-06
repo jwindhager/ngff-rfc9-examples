@@ -126,7 +126,7 @@ SHOULD be present, and (2) entries that are or may become larger than 4 GiB SHOU
 4. **No archive comment option** (checked in the function signature). `set_zip_comment()` in the example patches the comment
    onto a finished archive by rewriting the last two bytes of the end record; this also works for archives from the JDK zip file system
    (tested: `unzip -t` accepts the result).
-5. It also supports AES encryption, which RFC-9 prohibits at the archive level, and directory members.
+5. It also supports AES encryption, which RFC-9 prohibits (it prohibits encrypting ZIP entries and the central directory), and directory members.
 6. Not investigated: memory behavior for stored members.
 
 ### Recent changes in Python's `zipfile`
