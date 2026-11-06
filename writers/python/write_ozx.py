@@ -7,7 +7,8 @@ Standard library only (tested with Python 3.9). Usage:
 
 What it does, with the RFC-9 requirement it addresses:
   * every entry is STORED (no ZIP-level compression)           MUST
-  * no extra fields except ZIP64 (ZipInfo has none by default)  MUST
+  * no extra fields that change how entry data is interpreted
+    (ZipInfo writes none; ZIP64 fields are allowed)            MUST
   * nothing before the first local file header                  MUST
   * ZIP64 extra fields are requested for every entry in the local
     headers (force_zip64); the ZIP64 end records cannot be forced

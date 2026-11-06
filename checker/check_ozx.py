@@ -8,8 +8,9 @@ Checks of the central directory (MUST unless noted):
   - root `zarr.json` present
   - every entry uses STORE (method 0)
   - no encryption flag
-  - no extra fields other than 0x0001 (ZIP64), 0x5455 (extended timestamp),
-    0x7875 (Info-ZIP New Unix)
+  - no extra fields that change how the entry bytes are interpreted: 0x9901
+    (AE-x encryption), 0x0017 (strong encryption), 0x000f (patch descriptor);
+    extra fields not known to be compliant are reported as notices
   - single volume (disk numbers 0)
   - no data before the first local file header (lowest local header offset is 0)
 SHOULD / informational:
@@ -32,7 +33,10 @@ import struct
 import sys
 import urllib.request
 
-ALLOWED_EXTRA = {0x0001: "ZIP64", 0x5455: "extended timestamp", 0x7875: "Info-ZIP New Unix"}
+# Extra fields known to be compliant / non-compliant with requirement 7 of RFC-9
+COMPLIANT_EXTRA = {0x0001, 0x000a, 0x5455, 0x5855, 0x7855, 0x7875,
+                   0xa11e, 0xa220, 0xcafe, 0xd935, 0x7075, 0x6375}
+DISALLOWED_EXTRA = {0x9901: "AE-x encryption", 0x0017: "strong encryption", 0x000f: "patch descriptor"}
 CD_STRUCT = struct.Struct("<4s6H3L5H2L")
 
 
@@ -119,13 +123,17 @@ def main():
         must.append(f"{len(bad)} entries are not STORE, e.g. {bad[0]} (method {[e['method'] for e in E if e['method'] != 0][0]})")
     if any(e["flags"] & 1 for e in E):
         must.append("encrypted entries")
-    extra = {}
+    bad_extra, unknown_extra = {}, {}
     for e in E:
         for h in e["extra"]:
-            if h not in ALLOWED_EXTRA:
-                extra.setdefault(h, e["name"])
-    for h, n in extra.items():
-        must.append(f"disallowed extra field 0x{h:04x} (first seen on {n})")
+            if h in DISALLOWED_EXTRA:
+                bad_extra.setdefault(h, e["name"])
+            elif h not in COMPLIANT_EXTRA:
+                unknown_extra.setdefault(h, e["name"])
+    for h, n in bad_extra.items():
+        must.append(f"disallowed extra field 0x{h:04x} ({DISALLOWED_EXTRA[h]}, first seen on {n})")
+    for h, n in unknown_extra.items():
+        should.append(f"extra field 0x{h:04x} is not known to be compliant (first seen on {n})")
     if d["disk"] or d["cd_disk"] or any(e["disk"] for e in E):
         must.append("multi-volume archive")
     first = min((e["off"] for e in E), default=0)
